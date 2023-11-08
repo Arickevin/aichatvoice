@@ -23,36 +23,6 @@ const onChat = async () => {
     "messages": [
       {
         "role": "user",
-        "content": "讲个笑话"
-      }
-    ],
-    "stream": true,
-    "safe_mode": false
-  });
-
-  const requestOptions: RequestInit = {
-    method: 'POST',
-    headers: myHeaders,
-    body: requestBody,
-    redirect: 'follow'
-  };
-
-  try {
-    const response = await fetch("https://oa.api2d.net/v1/chat/completions", requestOptions);
-
-    if (response.body) {
-      const reader = response.body.getReader();
-      
-      // Function to process each chunk
-      const processChunk = async ({ done, value }: { done: boolean, value?: Uint8Array }) => {
-        if (done) {
-          // Stream is complete
-          return;
-        }
-        // Decode the Uint8Array to a string
-        const chunk = new TextDecoder().decode(value);
-        try {
-          // Parse the chunk as JSON          
           const json = JSON.parse(chunk.replace("data: ",""));
           // Extract the content from the choices array, if available
           const content = json.choices?.[0]?.delta?.content;
