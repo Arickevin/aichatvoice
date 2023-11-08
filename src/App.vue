@@ -1,58 +1,79 @@
 <template>
-    <div>
-      <button @click="onchat">click</button>
-      <textarea rows="10" cols="50" v-model="consoleOutput"></textarea>
-    </div>
-  </template>
-  
-  <script setup lang="ts">
-  import { ref } from 'vue';
-  
-  const consoleOutput = ref('');
-  
-  const captureConsoleLog = (message: string) => {
-    consoleOutput.value += message + '\n';
+  <div>
+    <button @click="onChat" class="hover:bg-red-600 focus:text-green-500 border-2 border-purple-600">开始</button>
+    <textarea rows="10" cols="50" v-model="consoleOutput"></textarea>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue';
+
+const consoleOutput = ref('');
+
+const onChat = async () => {
+  consoleOutput.value = ''; // Clear previous output
+
+  const myHeaders = new Headers();
+  myHeaders.append("Authorization", "Bearer fk204878-8B2CVJYFsTZkxlwk20qCKyAsyr7KwVem");
+  myHeaders.append("User-Agent", "YourApp/1.0.0");
+  myHeaders.append("Content-Type", "application/json");
+
+  const requestBody = JSON.stringify({
+    "model": "gpt-3.5-turbo",
+    "messages": [
+      {
+        "role": "user",
+        "content": "讲个笑话"
+      }
+    ],
+    "stream": true,
+    "safe_mode": false
+  });
+
+  const requestOptions: RequestInit = {
+    method: 'POST',
+    headers: myHeaders,
+    body: requestBody,
+    redirect: 'follow'
   };
-  
-  const onchat = () => {
-    consoleOutput.value = ''; // 清空先前的输出
-    var myHeaders = new Headers();
-    myHeaders.append("Authorization", "Bearer fk204878-8B2CVJYFsTZkxlwk20qCKyAsyr7KwVem");
-    myHeaders.append("User-Agent", "Apifox/1.0.0 (https://apifox.com)");
-    myHeaders.append("Content-Type", "application/json");
-  
-    var raw = JSON.stringify({
-      "model": "gpt-3.5-turbo",
-      "messages": [
-        {
-          "role": "user",
-          "content": "讲个笑话"
+
+  try {
+    const response = await fetch("https://oa.api2d.net/v1/chat/completions", requestOptions);
+
+    if (response.body) {
+      const reader = response.body.getReader();
+      
+      // Function to process each chunk
+      const processChunk = async ({ done, value }: { done: boolean, value?: Uint8Array }) => {
+        if (done) {
+          // Stream is complete
+          return;
         }
-      ],
-      "safe_mode": false
-    });
-  
-    var requestOptions = {
-      method: 'POST',
-      headers: myHeaders,
-      body: raw,
-      redirect: 'follow' as const
-    };
-  
-    fetch("https://oa.api2d.net/v1/chat/completions", requestOptions)
-      .then(response => response.text())
-      .then(result => {
-        captureConsoleLog(result); // 捕获控制台输出
-        // 使用$nextTick等待页面更新，然后滚动到底部以显示最新输出·
-        consoleOutput.value += result;
-        setTimeout(() => {
-          const textarea = document.querySelector('textarea');
-          if (textarea) {
-            textarea.scrollTop = textarea.scrollHeight;
+        // Decode the Uint8Array to a string
+        const chunk = new TextDecoder().decode(value);
+        try {
+          // Parse the chunk as JSON          
+          const json = JSON.parse(chunk.replace("data: ",""));
+          // Extract the content from the choices array, if available
+          const content = json.choices?.[0]?.delta?.content;
+          if (content) {
+            consoleOutput.value += content; // Append the content to the textarea value
           }
-        }, 0);
-      })
-      .catch(error => captureConsoleLog('error ' + error));
+        } catch (error) {
+          // Handle JSON parsing error or the structure not being what is expected
+          console.error('Error parsing JSON from chunk:', error);
+        }
+        // Read the next chunk
+        reader.read().then(processChunk);
+      };
+
+      // Start reading the stream
+      reader.read().then(processChunk);
+    } else {
+      consoleOutput.value = "The response is not a stream.";
+    }
+  } catch (error) {
+    consoleOutput.value = `Error: ${error}`;
   }
-  </script>
-  
+}
+</script>
